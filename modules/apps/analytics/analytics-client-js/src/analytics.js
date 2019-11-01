@@ -75,6 +75,10 @@ class Analytics {
 			instance = this;
 		}
 
+		if (this._isTrackingDisabled()) {
+			return instance;
+		}
+
 		const {endpointUrl, flushInterval} = config;
 
 		const client = new Client(endpointUrl);
@@ -123,9 +127,11 @@ class Analytics {
 			clearInterval(this.flushInterval);
 		}
 
-		instance._pluginDisposers
-			.filter(disposer => typeof disposer === 'function')
-			.forEach(disposer => disposer());
+		if (instance._pluginDisposers) {
+			instance._pluginDisposers
+				.filter(disposer => typeof disposer === 'function')
+				.forEach(disposer => disposer());
+		}
 	}
 
 	_ensureIntegrity() {
@@ -151,6 +157,14 @@ class Analytics {
 		}
 
 		return newUserIdRequired;
+	}
+
+	_isTrackingDisabled() {
+		if (ENV.ac_client_disable_tracking || navigator.doNotTrack) {
+			return true;
+		}
+
+		return false;
 	}
 
 	/**
@@ -311,6 +325,12 @@ class Analytics {
 	 * sent or no pending data was left to be sent
 	 */
 	flush() {
+		if (this._isTrackingDisabled()) {
+			this.disposeInternal();
+
+			return;
+		}
+
 		let result;
 
 		if (!this.isFlushInProgress && this.events.length) {
@@ -367,6 +387,10 @@ class Analytics {
 	 * );
 	 */
 	registerMiddleware(middleware) {
+		if (this._isTrackingDisabled()) {
+			return;
+		}
+
 		if (typeof middleware === 'function') {
 			this.client.use(middleware);
 		}
@@ -409,6 +433,10 @@ class Analytics {
 	 * @param {object} eventProps Complementary information about the event
 	 */
 	send(eventId, applicationId, eventProps) {
+		if (this._isTrackingDisabled()) {
+			return;
+		}
+
 		const currentContext = this._getContext();
 		const currentContextHash = hash(currentContext);
 
@@ -443,6 +471,10 @@ class Analytics {
 	 * @return {Promise} A promise resolved with the generated identity hash
 	 */
 	setIdentity(identity) {
+		if (this._isTrackingDisabled()) {
+			return;
+		}
+
 		this.config.identity = identity;
 
 		return this._getUserId().then(userId =>
