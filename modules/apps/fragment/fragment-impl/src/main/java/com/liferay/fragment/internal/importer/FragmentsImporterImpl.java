@@ -38,9 +38,12 @@ import com.liferay.portal.kernel.json.JSONObject;
 import com.liferay.portal.kernel.language.LanguageUtil;
 import com.liferay.portal.kernel.log.Log;
 import com.liferay.portal.kernel.log.LogFactoryUtil;
+import com.liferay.portal.kernel.model.Company;
+import com.liferay.portal.kernel.model.CompanyConstants;
 import com.liferay.portal.kernel.model.Repository;
 import com.liferay.portal.kernel.portletfilerepository.PortletFileRepositoryUtil;
 import com.liferay.portal.kernel.repository.model.FileEntry;
+import com.liferay.portal.kernel.service.CompanyLocalService;
 import com.liferay.portal.kernel.service.ServiceContext;
 import com.liferay.portal.kernel.service.ServiceContextThreadLocal;
 import com.liferay.portal.kernel.util.ArrayUtil;
@@ -472,6 +475,17 @@ public class FragmentsImporterImpl implements FragmentsImporter {
 				groupId, FragmentPortletKeys.FRAGMENT);
 
 		if (repository == null) {
+			if (groupId == CompanyConstants.SYSTEM) {
+				FragmentEntry fragmentEntry =
+					_fragmentEntryLocalService.getFragmentEntry(
+						fragmentEntryId);
+
+				Company company = _companyLocalService.getCompany(
+					fragmentEntry.getCompanyId());
+
+				groupId = company.getGroupId();
+			}
+
 			ServiceContext serviceContext = new ServiceContext();
 
 			serviceContext.setAddGroupPermissions(true);
@@ -692,6 +706,9 @@ public class FragmentsImporterImpl implements FragmentsImporter {
 
 	private static final Log _log = LogFactoryUtil.getLog(
 		FragmentsImporterImpl.class);
+
+	@Reference
+	private CompanyLocalService _companyLocalService;
 
 	@Reference
 	private FragmentCollectionLocalService _fragmentCollectionLocalService;

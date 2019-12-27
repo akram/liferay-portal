@@ -279,6 +279,9 @@ public class ContentPageEditorDisplayContext {
 			).put(
 				"fragments", editorSoyContext.get("elements")
 			).put(
+				"getAvailableTemplatesURL",
+				editorSoyContext.get("getAvailableTemplatesURL")
+			).put(
 				"hasEditSegmentsEntryPermission",
 				editorSoyContext.get("hasEditSegmentsEntryPermission")
 			).put(
@@ -300,6 +303,10 @@ public class ContentPageEditorDisplayContext {
 					"/content_layout/move_fragment_entry_link_react")
 			).put(
 				"portletNamespace", editorSoyContext.get("portletNamespace")
+			).put(
+				"publishURL", editorSoyContext.get("publishURL")
+			).put(
+				"redirectURL", editorSoyContext.get("redirectURL")
 			).put(
 				"renderFragmentEntryURL",
 				editorSoyContext.get("renderFragmentEntryURL")

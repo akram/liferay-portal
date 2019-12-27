@@ -14,17 +14,17 @@
 
 package com.liferay.data.engine.rest.internal.resource.v2_0;
 
+import com.liferay.data.engine.content.type.DataDefinitionContentType;
 import com.liferay.data.engine.field.type.util.LocalizedValueUtil;
 import com.liferay.data.engine.model.DEDataListView;
 import com.liferay.data.engine.rest.dto.v2_0.DataDefinition;
-import com.liferay.data.engine.rest.dto.v2_0.DataDefinitionPermission;
 import com.liferay.data.engine.rest.dto.v2_0.DataLayout;
 import com.liferay.data.engine.rest.dto.v2_0.DataLayoutColumn;
 import com.liferay.data.engine.rest.dto.v2_0.DataLayoutPage;
 import com.liferay.data.engine.rest.dto.v2_0.DataLayoutRow;
 import com.liferay.data.engine.rest.dto.v2_0.DataRecordCollection;
 import com.liferay.data.engine.rest.internal.constants.DataActionKeys;
-import com.liferay.data.engine.rest.internal.constants.DataDefinitionConstants;
+import com.liferay.data.engine.rest.internal.content.type.DataDefinitionContentTypeTracker;
 import com.liferay.data.engine.rest.internal.dto.v2_0.util.DataDefinitionUtil;
 import com.liferay.data.engine.rest.internal.dto.v2_0.util.DataLayoutUtil;
 import com.liferay.data.engine.rest.internal.dto.v2_0.util.DataRecordCollectionUtil;
@@ -106,13 +106,11 @@ import com.liferay.portal.vulcan.pagination.Pagination;
 import com.liferay.portal.vulcan.resource.EntityModelResource;
 import com.liferay.portal.vulcan.util.SearchUtil;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import java.util.ResourceBundle;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -178,6 +176,17 @@ public class DataDefinitionResourceImpl
 		return DataDefinitionUtil.toDataDefinition(
 			_ddmFormFieldTypeServicesTracker,
 			_ddmStructureLocalService.getStructure(dataDefinitionId));
+	}
+
+	@Override
+	public Page<DataDefinition> getDataDefinitionByContentTypeContentTypePage(
+			String contentType, String keywords, Pagination pagination,
+			Sort[] sorts)
+		throws Exception {
+
+		return getSiteDataDefinitionByContentTypeContentTypePage(
+			_portal.getSiteGroupId(contextCompany.getGroupId()), contentType,
+			keywords, pagination, sorts);
 	}
 
 	@Override
@@ -253,27 +262,26 @@ public class DataDefinitionResourceImpl
 	}
 
 	@Override
-	public DataDefinition getSiteDataDefinition(
-			Long siteId, String dataDefinitionKey, Long classNameId)
+	public DataDefinition getSiteDataDefinitionByContentTypeByDataDefinitionKey(
+			Long siteId, String contentType, String dataDefinitionKey)
 		throws Exception {
+
+		DataDefinitionContentType dataDefinitionContentType =
+			_dataDefinitionContentTypeTracker.getDataDefinitionContentType(
+				contentType);
 
 		return DataDefinitionUtil.toDataDefinition(
 			_ddmFormFieldTypeServicesTracker,
 			_ddmStructureLocalService.getStructure(
-				siteId,
-				Optional.ofNullable(
-					classNameId
-				).orElse(
-					_portal.getClassNameId(
-						InternalDataDefinition.class.getName())
-				),
+				siteId, dataDefinitionContentType.getClassNameId(),
 				dataDefinitionKey));
 	}
 
 	@Override
-	public Page<DataDefinition> getSiteDataDefinitionsPage(
-			Long siteId, Long classNameId, String keywords,
-			Pagination pagination, Sort[] sorts)
+	public Page<DataDefinition>
+			getSiteDataDefinitionByContentTypeContentTypePage(
+				Long siteId, String contentType, String keywords,
+				Pagination pagination, Sort[] sorts)
 		throws Exception {
 
 		if (pagination.getPageSize() > 250) {
@@ -291,17 +299,15 @@ public class DataDefinitionResourceImpl
 			};
 		}
 
-		Long dataDefinitionClassNameId = Optional.ofNullable(
-			classNameId
-		).orElse(
-			_portal.getClassNameId(InternalDataDefinition.class.getName())
-		);
+		DataDefinitionContentType dataDefinitionContentType =
+			_dataDefinitionContentTypeTracker.getDataDefinitionContentType(
+				contentType);
 
 		if (Validator.isNull(keywords)) {
 			return Page.of(
 				transform(
 					_ddmStructureLocalService.getStructures(
-						siteId, dataDefinitionClassNameId,
+						siteId, dataDefinitionContentType.getClassNameId(),
 						pagination.getStartPosition(),
 						pagination.getEndPosition(),
 						_toOrderByComparator(
@@ -309,7 +315,7 @@ public class DataDefinitionResourceImpl
 					this::_toDataDefinition),
 				pagination,
 				_ddmStructureLocalService.getStructuresCount(
-					siteId, dataDefinitionClassNameId));
+					siteId, dataDefinitionContentType.getClassNameId()));
 		}
 
 		return SearchUtil.search(
@@ -317,10 +323,11 @@ public class DataDefinitionResourceImpl
 			},
 			null, DDMStructure.class, keywords, pagination,
 			queryConfig -> queryConfig.setSelectedFieldNames(
-				Field.ENTRY_CLASS_PK),
+				Field.CLASS_NAME_ID, Field.ENTRY_CLASS_PK),
 			searchContext -> {
 				searchContext.setAttribute(
-					Field.CLASS_NAME_ID, dataDefinitionClassNameId);
+					Field.CLASS_NAME_ID,
+					dataDefinitionContentType.getClassNameId());
 				searchContext.setAttribute(Field.DESCRIPTION, keywords);
 				searchContext.setAttribute(Field.NAME, keywords);
 				searchContext.setCompanyId(contextCompany.getCompanyId());
@@ -334,51 +341,26 @@ public class DataDefinitionResourceImpl
 	}
 
 	@Override
-	public void postDataDefinitionDataDefinitionPermission(
-			Long dataDefinitionId, String operation,
-			DataDefinitionPermission dataDefinitionPermission)
+	public DataDefinition postDataDefinitionByContentType(
+			String contentType, DataDefinition dataDefinition)
 		throws Exception {
 
-		DDMStructure ddmStructure = _ddmStructureLocalService.getStructure(
-			dataDefinitionId);
-
-		DataEnginePermissionUtil.checkOperationPermission(
-			_groupLocalService, operation, ddmStructure.getGroupId());
-
-		List<String> actionIds = new ArrayList<>();
-
-		if (GetterUtil.getBoolean(dataDefinitionPermission.getDelete())) {
-			actionIds.add(ActionKeys.DELETE);
-		}
-
-		if (GetterUtil.getBoolean(dataDefinitionPermission.getUpdate())) {
-			actionIds.add(ActionKeys.UPDATE);
-		}
-
-		if (GetterUtil.getBoolean(dataDefinitionPermission.getView())) {
-			actionIds.add(ActionKeys.VIEW);
-		}
-
-		if (actionIds.isEmpty()) {
-			return;
-		}
-
-		DataEnginePermissionUtil.persistModelPermission(
-			actionIds, contextCompany, dataDefinitionId, operation,
-			DataDefinitionConstants.RESOURCE_NAME,
-			_resourcePermissionLocalService, _roleLocalService,
-			dataDefinitionPermission.getRoleNames(), ddmStructure.getGroupId());
+		return postSiteDataDefinitionByContentType(
+			_portal.getSiteGroupId(contextCompany.getGroupId()), contentType,
+			dataDefinition);
 	}
 
 	@Override
-	public DataDefinition postSiteDataDefinition(
-			Long siteId, DataDefinition dataDefinition)
+	public DataDefinition postSiteDataDefinitionByContentType(
+			Long siteId, String contentType, DataDefinition dataDefinition)
 		throws Exception {
 
 		DataEnginePermissionUtil.checkPermission(
 			DataActionKeys.ADD_DATA_DEFINITION, _groupLocalService, siteId);
 
-		ServiceContext serviceContext = new ServiceContext();
+		DataDefinitionContentType dataDefinitionContentType =
+			_dataDefinitionContentTypeTracker.getDataDefinitionContentType(
+				contentType);
 
 		DDMFormSerializerSerializeRequest.Builder builder =
 			DDMFormSerializerSerializeRequest.Builder.newBuilder(
@@ -388,29 +370,25 @@ public class DataDefinitionResourceImpl
 		DDMFormSerializerSerializeResponse ddmFormSerializerSerializeResponse =
 			_ddmFormSerializer.serialize(builder.build());
 
-		Long classNameId = Optional.ofNullable(
-			dataDefinition.getClassNameId()
-		).orElse(
-			_portal.getClassNameId(InternalDataDefinition.class.getName())
-		);
-
 		dataDefinition = DataDefinitionUtil.toDataDefinition(
 			_ddmFormFieldTypeServicesTracker,
 			_ddmStructureLocalService.addStructure(
 				PrincipalThreadLocal.getUserId(), siteId,
-				DDMStructureConstants.DEFAULT_PARENT_STRUCTURE_ID, classNameId,
+				DDMStructureConstants.DEFAULT_PARENT_STRUCTURE_ID,
+				dataDefinitionContentType.getClassNameId(),
 				dataDefinition.getDataDefinitionKey(),
 				LocalizedValueUtil.toLocaleStringMap(dataDefinition.getName()),
 				LocalizedValueUtil.toLocaleStringMap(
 					dataDefinition.getDescription()),
 				ddmFormSerializerSerializeResponse.getContent(),
 				GetterUtil.getString(dataDefinition.getStorageType(), "json"),
-				serviceContext));
+				new ServiceContext()));
 
-		_resourceLocalService.addModelResources(
+		_resourceLocalService.addResources(
 			contextCompany.getCompanyId(), siteId,
-			PrincipalThreadLocal.getUserId(), _portal.getClassName(classNameId),
-			dataDefinition.getId(), serviceContext.getModelPermissions());
+			PrincipalThreadLocal.getUserId(),
+			_portal.getClassName(dataDefinitionContentType.getClassNameId()),
+			dataDefinition.getId(), false, false, false);
 
 		CommonDataRecordCollectionResource<DataRecordCollection>
 			commonDataRecordCollectionResource =
@@ -429,39 +407,6 @@ public class DataDefinitionResourceImpl
 				dataDefinition.getDescription(), dataDefinition.getName());
 
 		return dataDefinition;
-	}
-
-	@Override
-	public void postSiteDataDefinitionPermission(
-			Long siteId, String operation,
-			DataDefinitionPermission dataDefinitionPermission)
-		throws Exception {
-
-		DataEnginePermissionUtil.checkOperationPermission(
-			_groupLocalService, operation, siteId);
-
-		List<String> actionIds = new ArrayList<>();
-
-		if (GetterUtil.getBoolean(
-				dataDefinitionPermission.getAddDataDefinition())) {
-
-			actionIds.add(DataActionKeys.ADD_DATA_DEFINITION);
-		}
-
-		if (GetterUtil.getBoolean(
-				dataDefinitionPermission.getDefinePermissions())) {
-
-			actionIds.add(ActionKeys.PERMISSIONS);
-		}
-
-		if (actionIds.isEmpty()) {
-			return;
-		}
-
-		DataEnginePermissionUtil.persistPermission(
-			actionIds, contextCompany, operation,
-			_resourcePermissionLocalService, _roleLocalService,
-			dataDefinitionPermission.getRoleNames());
 	}
 
 	@Override
@@ -601,6 +546,10 @@ public class DataDefinitionResourceImpl
 				resourceBundle)
 		).put(
 			"name", ddmFormFieldName
+		).put(
+			"scope",
+			MapUtil.getString(
+				ddmFormFieldTypeProperties, "ddm.form.field.type.scope")
 		).put(
 			"settingsContext",
 			_createFieldContextJSONObject(
@@ -839,6 +788,9 @@ public class DataDefinitionResourceImpl
 
 	private static final EntityModel _entityModel =
 		new DataDefinitionEntityModel();
+
+	@Reference
+	private DataDefinitionContentTypeTracker _dataDefinitionContentTypeTracker;
 
 	@Reference(
 		target = "(model.class.name=com.liferay.data.engine.rest.internal.model.InternalDataRecordCollection)"

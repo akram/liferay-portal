@@ -66,6 +66,7 @@ import com.liferay.portal.kernel.util.LocaleThreadLocal;
 import com.liferay.portal.kernel.util.LocaleUtil;
 import com.liferay.portal.kernel.util.MapUtil;
 import com.liferay.portal.kernel.util.Portal;
+import com.liferay.portal.kernel.util.SetUtil;
 import com.liferay.portal.kernel.util.StringUtil;
 import com.liferay.portal.kernel.util.Validator;
 
@@ -120,10 +121,10 @@ public class DataLayoutTaglibUtil {
 	}
 
 	public static JSONArray getFieldTypesJSONArray(
-		HttpServletRequest httpServletRequest) {
+		HttpServletRequest httpServletRequest, Set<String> scopes) {
 
 		return _dataLayoutTaglibUtil._getFieldTypesJSONArray(
-			httpServletRequest);
+			httpServletRequest, scopes);
 	}
 
 	public static String renderDataLayout(
@@ -288,7 +289,9 @@ public class DataLayoutTaglibUtil {
 	}
 
 	private JSONArray _getFieldTypesJSONArray(
-		HttpServletRequest httpServletRequest) {
+		HttpServletRequest httpServletRequest, Set<String> scopes) {
+
+		JSONArray fieldTypesJSONArray = _jsonFactory.createJSONArray();
 
 		String cookie = CookieKeys.getCookie(
 			httpServletRequest, CookieKeys.JSESSIONID);
@@ -306,12 +309,33 @@ public class DataLayoutTaglibUtil {
 			).build();
 
 		try {
-			return _jsonFactory.createJSONArray(
+			JSONArray jsonArray = _jsonFactory.createJSONArray(
 				dataDefinitionResource.
 					getDataDefinitionDataDefinitionFieldFieldTypes());
+
+			if (SetUtil.isEmpty(scopes)) {
+				return jsonArray;
+			}
+
+			for (JSONObject jsonObject : (Iterable<JSONObject>)jsonArray) {
+				String[] fieldTypeScopes = StringUtil.split(
+					jsonObject.getString("scope"));
+
+				boolean anyMatch = Stream.of(
+					fieldTypeScopes
+				).anyMatch(
+					scope -> scopes.contains(scope)
+				);
+
+				if (anyMatch) {
+					fieldTypesJSONArray.put(jsonObject);
+				}
+			}
+
+			return fieldTypesJSONArray;
 		}
 		catch (Exception e) {
-			return _jsonFactory.createJSONArray();
+			return fieldTypesJSONArray;
 		}
 	}
 

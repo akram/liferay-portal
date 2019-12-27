@@ -23,6 +23,7 @@ import com.liferay.portal.aop.AopService;
 import com.liferay.portal.kernel.model.Layout;
 import com.liferay.portal.kernel.portlet.bridges.mvc.BaseMVCActionCommand;
 import com.liferay.portal.kernel.portlet.bridges.mvc.MVCActionCommand;
+import com.liferay.portal.kernel.security.auth.PrincipalException;
 import com.liferay.portal.kernel.security.permission.ActionKeys;
 import com.liferay.portal.kernel.service.LayoutLocalService;
 import com.liferay.portal.kernel.service.permission.LayoutPermissionUtil;
@@ -72,8 +73,18 @@ public class DiscardDraftLayoutMVCActionCommand
 
 		long plid = ParamUtil.getLong(actionRequest, "classPK");
 
-		LayoutPermissionUtil.check(
-			themeDisplay.getPermissionChecker(), plid, ActionKeys.UPDATE);
+		try {
+			LayoutPermissionUtil.check(
+				themeDisplay.getPermissionChecker(), plid, ActionKeys.UPDATE);
+		}
+		catch (PrincipalException pe) {
+			if (!LayoutPermissionUtil.contains(
+					themeDisplay.getPermissionChecker(), plid,
+					ActionKeys.UPDATE_LAYOUT_CONTENT)) {
+
+				throw pe;
+			}
+		}
 
 		Layout draftLayout = _layoutLocalService.getLayout(plid);
 

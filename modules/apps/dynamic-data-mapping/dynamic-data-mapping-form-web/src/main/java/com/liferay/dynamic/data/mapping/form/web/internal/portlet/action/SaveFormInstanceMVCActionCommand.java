@@ -86,6 +86,11 @@ public class SaveFormInstanceMVCActionCommand
 
 			actionRequest.setAttribute(WebKeys.REDIRECT, portletURL.toString());
 		}
+		catch (DDMFormValidationException.MustSetValidCharactersForFieldName
+					msvcffn) {
+
+			SessionErrors.add(actionRequest, msvcffn.getClass(), msvcffn);
+		}
 		catch (DDMFormValidationException.MustSetValidFormRuleExpression
 					msvfre) {
 

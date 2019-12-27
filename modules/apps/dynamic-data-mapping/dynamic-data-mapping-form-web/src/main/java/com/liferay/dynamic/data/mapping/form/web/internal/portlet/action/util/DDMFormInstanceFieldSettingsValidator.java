@@ -198,12 +198,16 @@ public class DDMFormInstanceFieldSettingsValidator {
 
 				@Override
 				public void accept(JSONObject jsonObject) {
-					DDMFormField field = ddmFormFieldsMap.get(
+					DDMFormField ddmFormField = ddmFormFieldsMap.get(
 						jsonObject.getString("fieldName"));
+
+					if (ddmFormField == null) {
+						return;
+					}
 
 					DDMFormFieldType ddmFormFieldType =
 						_ddmFormFieldTypeServicesTracker.getDDMFormFieldType(
-							field.getType());
+							ddmFormField.getType());
 
 					DDMForm fieldDDMForm = DDMFormFactory.create(
 						ddmFormFieldType.getDDMFormFieldTypeSettings());
@@ -223,11 +227,13 @@ public class DDMFormInstanceFieldSettingsValidator {
 						fieldDDMForm, ddmFormEvaluatorEvaluateResponse,
 						fieldDDMForm.getDefaultLocale());
 
-					if (!invalidDDMFormFields.isEmpty()) {
-						fieldNamePropertiesMap.put(
-							getFieldLabel(field, ddmForm.getDefaultLocale()),
-							invalidDDMFormFields);
+					if (invalidDDMFormFields.isEmpty()) {
+						return;
 					}
+
+					fieldNamePropertiesMap.put(
+						getFieldLabel(ddmFormField, ddmForm.getDefaultLocale()),
+						invalidDDMFormFields);
 				}
 
 			});
